@@ -1,0 +1,116 @@
+<template>
+  <div class="node-menu" :style="menuStyle">
+    <div class="menu-content">
+      <button v-for="(item, index) in menuItems" :key="index" @click="$emit('add-child', item.action)">
+        <span class="icon" :class="item.iconClass"></span>
+        {{ item.label }}
+      </button>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { computed } from 'vue';
+
+const props = defineProps({
+  position: {
+    type: Object,
+    required: true,
+  },
+});
+
+const menuStyle = computed(() => ({
+  left: `${props.position.x + 1}px`,
+  top: `${props.position.y + 2}px`,
+}));
+
+const menuItems = [
+  { label: '请求数据', action: 'node1', iconClass: 'i-data' },
+  { label: '页面跳转', action: 'node2', iconClass: 'i-navigate' },
+  { label: '数据转换', action: 'transform', iconClass: 'i-transform' },
+  { label: '条件判断', action: 'condition', iconClass: 'i-condition' },
+  { label: '循环操作', action: 'loop', iconClass: 'i-loop' },
+  { label: '异常处理', action: 'error', iconClass: 'i-error' },
+  { label: '数据存储', action: 'store', iconClass: 'i-store' },
+  { label: '消息推送', action: 'notify', iconClass: 'i-notify' },
+  { label: '定时任务', action: 'schedule', iconClass: 'i-schedule' },
+  { label: 'API调用', action: 'api', iconClass: 'i-api' },
+];
+
+defineEmits(['add-child']);
+</script>
+
+<style scoped>
+.node-menu {
+  position: absolute;
+  background-color: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  z-index: 1000;
+  width: 140px;
+  max-height: 300px;
+  overflow: hidden;
+}
+
+.menu-content {
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.menu-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.menu-content::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.menu-content::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.menu-content::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 8px 10px;
+  background-color: transparent;
+  color: #333;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 13px;
+  transition: background-color 0.2s;
+}
+
+button:hover {
+  background-color: #f0f0f0;
+}
+
+.icon {
+  margin-right: 8px;
+  width: 16px;
+  height: 16px;
+  display: inline-block;
+}
+
+.i-data::before { content: '📊'; }
+.i-navigate::before { content: '🔀'; }
+.i-transform::before { content: '🔄'; }
+.i-condition::before { content: '🔀'; }
+.i-loop::before { content: '🔁'; }
+.i-error::before { content: '⚠️'; }
+.i-store::before { content: '💾'; }
+.i-notify::before { content: '📢'; }
+.i-schedule::before { content: '⏰'; }
+.i-api::before { content: '🌐'; }
+</style>
