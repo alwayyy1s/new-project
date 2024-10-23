@@ -1,587 +1,725 @@
 <template>
-    <div class="app-container" :class="{ 'sidebar-collapsed': !sidebarVisible }">
-      <div class="sidebar">
-        <div class="sidebar-header">
-          <h2 v-if="sidebarVisible">对话列表</h2>
-          <button @click="toggleSidebar" class="toggle-sidebar-btn">
-            <span v-if="sidebarVisible">&#x25C0;</span>
-            <span v-else>&#x25B6;</span>
-          </button>
-        </div>
-        <button v-if="sidebarVisible" @click="createNewConversation" class="new-chat-btn">
-          <span class="icon">+</span> 新建对话
-        </button>
-        <div v-if="sidebarVisible" class="conversation-list">
-          <div 
-            v-for="(conv, index) in conversations" 
-            :key="index" 
-            class="conversation-item"
-            :class="{ 'active': currentConversationIndex === index }"
-          >
-            <span @click="selectConversation(index)" class="conversation-title">{{ conv.title }}</span>
-            <button @click="deleteConversation(index)" class="delete-btn" title="删除对话">×</button>
-          </div>
-        </div>
-      </div>
-  
-      <div class="chat-container">
+    <div class="app-container" >
+      <div class="chat-container" :style="{ width: chatWidth + 'px' }">
+        <!-- 聊天消息区域 -->
         <div class="chat-box">
-          <div class="chat-header">
-            <h1>AI 助手</h1>
-          </div>
+          <!-- 聊天消息列表 -->
           <div class="chat-messages" ref="chatMessages">
-            <div v-for="(message, index) in currentConversation.messages" :key="index" class="message-wrapper">
+            <div v-for="(message, index) in currentConversation.messages" :key="index" v-memo="[message.text, message.file]" class="message-wrapper">
               <div :class="['message', message.sender === 'user' ? 'user-message' : 'ai-message']">
-                <div class="message-content">
-                  <div v-if="message.text">{{ message.text }}</div>
-                  </div>
+                  <div class="message-content" v-if="message.sender === 'user'">{{ message.text }}</div>
+                  <div class="message-content" v-else v-html="parseStyleTags(message.text)" @click="handleLinkClick" ></div>
               </div>
               <div v-if="message.file" :class="['file-message', message.sender==='user'?'user-file':'ai-file']" @click="viewFile(message.file)">
                 <div class="file-icon">
                     <!-- 用户文件图标 -->
-                    <svg v-if="message.sender === 'user'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
-                      <path d="M19.5 21a3 3 0 003-3v-4.5a3 3 0 00-3-3h-15a3 3 0 00-3 3V18a3 3 0 003 3h15zM1.5 10.146V6a3 3 0 013-3h5.379a2.25 2.25 0 011.59.659l2.122 2.121c.14.141.331.22.53.22H19.5a3 3 0 013 3v1.146A4.483 4.483 0 0019.5 9h-15a4.483 4.483 0 00-3 1.146z" />
-                    </svg>
-                    <!-- AI 文件图标 -->
-                    <svg v-else t="1727160191758" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1494" width="200" height="200"><path d="M512 81.92l372.736 215.04v430.08L512 942.08 139.264 727.04v-430.08L512 81.92m0-81.92c-14.336 0-28.672 4.096-40.96 10.24L98.304 225.28c-24.576 14.336-40.96 40.96-40.96 71.68v430.08c0 28.672 16.384 55.296 40.96 71.68L471.04 1013.76c12.288 8.192 26.624 10.24 40.96 10.24s28.672-4.096 40.96-10.24L925.696 798.72c24.576-14.336 40.96-40.96 40.96-71.68v-430.08c0-28.672-16.384-55.296-40.96-71.68L552.96 10.24c-12.288-6.144-26.624-10.24-40.96-10.24z" p-id="1495"></path><path d="M698.368 352.256L532.48 450.56c-12.288 8.192-28.672 8.192-43.008 0l-153.6-96.256c-18.432-12.288-45.056-6.144-57.344 12.288-12.288 18.432-6.144 45.056 12.288 57.344l157.696 98.304c12.288 8.192 18.432 20.48 18.432 34.816V757.76c0 22.528 18.432 40.96 40.96 40.96s40.96-18.432 40.96-40.96v-200.704c0-14.336 8.192-28.672 20.48-34.816l167.936-100.352c20.48-12.288 26.624-36.864 14.336-55.296-8.192-20.48-32.768-26.624-53.248-14.336z" p-id="1496">
-                    </path></svg>
+                <i v-if="message.sender === 'user'" class="iconfont icon-yonghu-wenjianjia"></i>
+                  <!-- AI 文件图标 -->
+                <i v-else class="iconfont icon-kapai-wenjian"></i>
                   </div>
-                    <div class="file-info">
+                  <!-- 文件信息 -->
+                <div class="file-info">
                       <span class="file-name">{{ message.file.name }}</span>
                       <span class="file-size">{{ formatFileSize(message.file.size) }}</span>
-                    </div>  
+                  </div>  
                 </div>
             </div>
+            <div v-if="isTyping" class="typing-indicator">AI正在输入...</div>
           </div>
-          
+          <!-- 新增: 新建对话按钮 -->
+          <div class="new-chat-button">
+        <button @click="newConversation">
+          <i class="iconfont icon-tianjia"></i>
+          新建对话</button>
+            </div>
+      <!-- 输入区域 -->
           <div class="input-area">
-            <form @submit.prevent="sendMessage" class="message-form">
-              <textarea 
-                v-model="userInput"
-                @input="adjustTextareaHeight"
-                @keydown.enter.exact.prevent="sendMessage"
-                placeholder="输入消息..."
-                class="input-field"
-                rows="1"
-                ref="inputField"
-              ></textarea>
-              <button type="submit" class="send-button" :disabled="!userInput.trim() ">
-                <span class="icon">&#x27A4;</span>
-              </button>
-            </form>
-            
-            <div class="file-upload">
-              <input 
-                type="file" 
-                ref="fileInput" 
-                @change="onFileSelected" 
-                class="file-input"
-              />
-              <button  class="upload-button" @click="fileUpload">
-                <span class="icon">&#x1F4C1;</span> 上传文件
-              </button>
-            </div>
-            
-            <div v-if="selectedFile" class="selected-file">
-              已选择文件: {{ selectedFile.name }}
-            </div>
-          </div>
-        </div>
+            <div class="message-form">
+              <!-- 文件上传 -->
+              <div class="file-upload">
+                <input 
+                  type="file" 
+                  ref="fileInput" 
+                  @change="onFileSelected" 
+                  class="file-input"
+                />
+                <span class="file-icon iconfont icon-weibiaoti--" @click="fileUpload"></span> 
+              </div>
+              <!-- 输入框 -->
+        <textarea 
+          v-model="userInput"
+          @input="adjustTextareaHeight"
+          @keydown.enter.exact.prevent="sendMessage"
+          placeholder="请输入内容"
+          class="input-field"
+          rows="1"
+          ref="inputField"
+        ></textarea>
+        <!-- 发送按钮 -->
+        <button 
+        @click="isTyping ? stopAIResponse() : sendMessage()" 
+        class="send-button" 
+        :disabled="!userInput.trim() && !selectedFile && !isTyping"
+      >
+        <span class="icon iconfont" :class="isTyping ? 'icon-zanting' : 'icon-fasong'"></span>
+      </button>
       </div>
+      <!-- 文件预览 -->
+      <div v-if="selectedFile" class="file-preview">
+        <div class="file-icon">
+          <span class="iconfont icon-weibiaoti--"></span>
+        </div>
+        <div class="file-info">
+          <div class="file-name">{{ selectedFile.name }}</div>
+          <div class="file-size">PDF, {{ formatFileSize(selectedFile.size) }}</div>
+        </div>
+        <button @click="removeFile" class="remove-file-btn">
+          <span class="iconfont icon-chahao"></span>
+        </button>
+      </div>
+      </div>
+      </div>
+      
+   <!-- 调整窗口大小分割线-->
     </div>
-  </template>
-  
-  <script setup>
-  import { ref, onMounted, nextTick, computed } from 'vue'
-  import deal from '@/utils/deal'
-  const conversations = ref([
-    {
-      title: '初始对话',
-      messages: [{ sender: 'ai', text: '你好！我能为你做些什么？' ,}]
-    }
-  ])
-  
+    <div class="resizer" @mousedown="startResize" v-if="resultWindowVisible"></div>
+    <!-- 结果窗口 -->
+    <resultWindow v-model="resultWindowVisible" 
+    :resultUrl="resultUrl" 
+    @close="closeResultWindow"
+    :style="{ width: resultWidth + 'px' }">
+  </resultWindow>
+    </div>
 
-  const currentConversationIndex = ref(0)
-  const userInput = ref('')
-  const selectedFile = ref(null)
-  const chatMessages = ref(null)
-  const inputField = ref(null)
-  const sidebarVisible = ref(true)
-  const aiResponse = ref(null) 
-  const fileInput = ref(null);
-  const currentConversation = computed(() => conversations.value[currentConversationIndex.value])
-  
-  const sendMessage = async () => {
-  if (!userInput.value.trim()) return;
-
-  const userMessage = userInput.value.trim();
-  const newMessage = {
-    sender: 'user',
-    text: userMessage,
-    file: selectedFile.value
-  };
-
-  currentConversation.value.messages.push(newMessage);
-  userInput.value = '';
-  await nextTick();
-  scrollToBottom();
-
-  try {
-    aiResponse.value= await deal(selectedFile.value, userMessage);
-    console.log(aiResponse)
-    if (aiResponse.value.file) {
-       const aiMessage = {
-        sender: 'ai',
-        text: aiResponse.value.response,
-        file: aiResponse.value.file
-    };
-    currentConversation.value.messages.push(aiMessage);
-    }
-    else{
-      const aiMessage= {
-        sender: 'ai',
-        text: aiResponse.value.response,
-      }
-      currentConversation.value.messages.push(aiMessage);
-    }
     
+</template>
+  
+<script setup>
+import { ref, onMounted, nextTick, computed ,onUnmounted,watch} from 'vue'
+import resultWindow from './resultWindow.vue'
+import deal from '@/utils/deal'
+import {useWorkflowStore} from '@/stores/counter.js'
+import { useConversationStore } from '@/stores/counter'
+import axios from 'axios';
+// const conversations = ref([
+//   {
+//     title: '初始对话',
+//     messages: [{ sender: 'ai', text: '你好！我能为你做些什么？' ,}]
+//   }
+// ])
+const conversationStore = useConversationStore()
+const currentConversation = computed(() => conversationStore.currentConversation)
+const workflowStore = useWorkflowStore();
+const userInput = ref('')
+const selectedFile = ref(null)
+const chatMessages = ref(null)
+const inputField = ref(null)
+const aiResponse = ref(null) 
+const aiMessage = ref(null)
+const isTyping = ref(false)
+const stopTyping = ref(false)
+const fileInput = ref(null);
+const resultWindowVisible = ref(false)
+const resultUrl = ref('')
+
+const chatWidth = ref(1000)
+const resultWidth = ref(0)
+
+// 处理超链接点击事件
+const handleLinkClick = (event) => {
+  if (event.target.classList.contains('workflow-link')) {
+    event.preventDefault();
+    const url = event.target.dataset.url;
+    console.log(url)
+
+    // 确保图数据已经存储在 Pinia store 中
+    if (aiResponse.value && aiResponse.value.workflow && aiResponse.value.workflow.graph_data) {
+      workflowStore.updateGraphData('currentGraph', aiResponse.value.workflow.graph_data);
+    console.log('Graph data in store:', workflowStore.graphData['currentGraph']);
+  }
+
+    
+
+    // 使用 nextTick 确保数据更新后再打开结果窗口
+    nextTick(() => {
+    resultUrl.value = url;
+    resultWindowVisible.value = true;
+    chatWidth.value = 1000;
+    resultWidth.value = 500;
+      
+    });
+  }
+  
+};
+// 关闭结果窗口
+const closeResultWindow = () => {
+resultWindowVisible.value = false
+chatWidth.value = 1000
+resultWidth.value = 0
+}
+// 开始调整窗口大小
+const startResize = (e) => {
+e.preventDefault()
+window.addEventListener('mousemove', resize)
+window.addEventListener('mouseup', stopResize)
+}
+// 调整窗口大小
+const resize = (e) => {
+const newChatWidth = e.clientX
+const newResultWidth = window.innerWidth - e.clientX
+if (newChatWidth > 200 && newResultWidth > 200) { // 设置最小宽度
+  chatWidth.value = newChatWidth
+  resultWidth.value = newResultWidth
+}
+}
+// 停止调整窗口大小
+const stopResize = () => {
+window.removeEventListener('mousemove', resize)
+window.removeEventListener('mouseup', stopResize)
+}
+// 新建对话
+const newConversation = () => {
+conversationStore.createNewConversation()
+}
+// 发送消息
+const sendMessage = async () => {
+if (!userInput.value.trim()) return;
+
+const userMessage = userInput.value.trim();
+const newMessage = {
+  sender: 'user',
+  text: userMessage,
+  file: selectedFile.value
+};
+
+// currentConversation.value.messages.push(newMessage);
+conversationStore.addMessage(newMessage)
+await nextTick();
+userInput.value = '';
+scrollToBottom();
+
+// 获取AI响应
+try {
+  aiResponse.value= await deal(selectedFile.value, userMessage);
+  console.log(aiResponse.value)
+  console.log(typeof aiResponse.value.workflow.node_description)
+  isTyping.value = true;
+  stopTyping.value = false;
+
+  // if (typeof  aiResponse.value.response === 'object') {
+  //     aiResponse.value.response = aiResponse.value.response.join('')
+  // }
+  // 初始化AI消息
+  aiMessage.value = {
+      sender: 'ai',
+      text: '',
+  };
+  // 将AI消息添加到当前对话中
+  currentConversation.value.messages.push(aiMessage.value);
+  let formattedNodeDescription = '';
+  // 格式化 node_description
+if (aiResponse.value.workflow && aiResponse.value.workflow.node_description) {
+      formattedNodeDescription = formatNodeDescription(aiResponse.value.workflow.node_description);
+      
+    }
+  //得到AI所有消息
+  const aiMessages = aiResponse.value.workflow.description+formattedNodeDescription+aiResponse.value.workflow.flow_url
+  // 流式效果输出AI响应
+  for (let char of aiMessages) {
+    if (stopTyping.value) break;
+    aiMessage.value.text += char;
+    
+    await new Promise(resolve => setTimeout(resolve, 10)); // 控制输出速度
     await nextTick();
     scrollToBottom();
-  } catch (error) {
-    console.error('获取AI响应时出错:', error);
-    // 可以在这里添加错误处理逻辑，比如显示错误消息给用户
   }
+  currentConversation.value.messages.push({sender:'ai',text:aiResponse.value.tool_output.response});
+  //接收文件信息
+  if (aiResponse.value.workflow.flow_url) {
+    aiMessage.value.file = aiResponse.value.file
+    await nextTick();
+    scrollToBottom();
+  }
+  
+  isTyping.value = false;
+  stopTyping.value = false;
+  clearSelectedFile()
+  if(aiResponse.value.workflow.graph_data){ 
+    const graph_data=aiResponse.value.workflow.graph_data
+    workflowStore.updateGraphData('currentGraph',graph_data)
+    console.log(workflowStore.graphData['currentGraph'])
 
-  selectedFile.value = null;
-  if (fileInput.value) {
-    fileInput.value.value = ''
-  }
-};
-
-const scrollToBottom = () => {
-  if (chatMessages.value) {
-    chatMessages.value.scrollTop = chatMessages.value.scrollHeight;
-  }
-};
-  
-  const onFileSelected = (event) => {
-    selectedFile.value = event.target.files[0]
-  }
-  
-  const adjustTextareaHeight = () => {
-    const textarea = inputField.value
-    textarea.style.height = 'auto'
-    textarea.style.height = textarea.scrollHeight + 'px'
-  }
-  
-  const createNewConversation = () => {
-    conversations.value.push({
-      title: `对话 ${conversations.value.length + 1}`,
-      messages: [{ sender: 'ai', text: '这是一个新的对话。我能为你做些什么？' }]
-    })
-    currentConversationIndex.value = conversations.value.length - 1
-  }
-  
-  const selectConversation = (index) => {
-    currentConversationIndex.value = index
-  }
-  
-  const deleteConversation = (index) => {
-    if (conversations.value.length > 1) {
-      conversations.value.splice(index, 1)
-      if (currentConversationIndex.value >= conversations.value.length) {
-        currentConversationIndex.value = conversations.value.length - 1
-      }
-    }
-  }
-  
-  const toggleSidebar = () => {
-    sidebarVisible.value = !sidebarVisible.value
-  }
-  
-  const formatFileSize = (bytes) => {
-    if (bytes < 1024) return bytes + ' B'
-    else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'
-    else if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB'
-    else return (bytes / 1073741824).toFixed(1) + ' GB'
-  }
-  const fileUpload = () => {
-    if (fileInput.value)
-    fileInput.value.click()
-  }
-  const viewFile = (file) => {
-    if (file.path) {
-    const url=file.path
-    window.open(url, '_blank')
-  }}
- 
-  onMounted(() => {
-    adjustTextareaHeight()
-  })
-  </script>
-  
-  <style scoped>
-  .app-container {
-    display: flex;
-    height: 100vh;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    color: #333;
-    background-color: #f5f5f5;
-    transition: all 0.3s ease;
-  }
-  
-  .sidebar {
-    width: 280px;
-    background-color: #f3f4f6;
-    color: #1b1b1c;
-    padding: 20px;
-    transition: all 0.3s ease;
-    display: flex;
-    flex-direction: column;
-  }
-  
-  .sidebar h2 {
-    margin: 0 auto;
-  }
-  
-  .sidebar-collapsed .sidebar {
-    width: 60px;
-    padding: 20px 10px;
-  }
-  
-  .sidebar-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-  }
-  
-  .toggle-sidebar-btn {
-    background: none;
-    border: none;
-    color: #1b1b1c;
-    font-size: 20px;
-    cursor: pointer;
-    padding: 5px;
-    transition: transform 0.3s ease;
-  }
-  
-  .sidebar-collapsed .toggle-sidebar-btn {
-    transform: rotate(180deg);
-  }
-  
-  .new-chat-btn {
-    width: 100%;
-    padding: 10px;
-    background-color: #3498db;
-    color: #1b1b1c;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    margin-bottom: 20px;
-    transition: background-color 0.3s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .new-chat-btn:hover {
-    background-color: #2980b9;
-  }
-  
-  .conversation-list {
-    overflow-y: auto;
-    flex-grow: 1;
-  }
-  
-  .conversation-item {
-    padding: 10px;
-    cursor: pointer;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-radius: 5px;
-    margin-bottom: 5px;
-    transition: background-color 0.3s;
-  }
-  
-  .conversation-item:hover {
-    background-color: #878d9a;
-  }
-  
-  .conversation-item.active {
-    background-color: #766bed;
-  }
-  
-  .conversation-title {
-    flex-grow: 1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  
-  .delete-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 18px;
-    color: #ecf0f1;
-    opacity: 0.7;
-    transition: opacity 0.3s;
-  }
-  
-  .delete-btn:hover {
-    opacity: 1;
-  }
-  
-  .chat-container {
-    flex-grow: 1;
-    display: flex;
-    flex-direction: column;
-    transition: all 0.3s ease;
-  }
-  
-  .sidebar-collapsed .chat-container {
-    margin-left: 60px;
-  }
-  
-  .chat-box {
-    flex-grow: 1;
-    display: flex;
-    flex-direction: column;
-    background-color: #ffffff;
-    border-radius: 10px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-    margin: 20px;
-    overflow: hidden;
-  }
-  
-  .chat-header {
-    background-color: #f3f4f6;
-    color: black;
-    padding: 15px 20px;
-    text-align: center;
-  }
-  
-  .chat-header h1 {
-    margin: 0;
-    font-size: 24px;
-  }
-  
-  .chat-messages {
-    flex-grow: 1;
-    overflow-y: auto;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-  }
-  
-  .message-wrapper {
-    display: flex;
-    flex-direction: column;
-    margin-bottom: 15px;
-  }
-  
-  .message {
-    max-width: 70%;
-    padding: 10px 15px;
-    border-radius: 20px;
-    line-height: 1.4;
-  }
-  
-  .user-message {
-    background-color: #3498db;
-    color: white;
-    margin-left: auto;
-    margin-bottom: 5px;
-    border-bottom-right-radius: 0;
-  }
-  
-  .ai-message {
-    background-color: #ecf0f1;
-    color: #333;
-    margin-right: auto;
-    margin-bottom: 5px;
-    border-bottom-left-radius: 0;
-  }
-  
-  .message-content {
-    word-wrap: break-word;
-    white-space: pre-wrap;
-  }
-  
-  .user-file {
-    width: 130px;
-    display: flex;
-    align-items: center;
-    background-color: #f0f0f0;
-    border-radius: 10px;
-    padding: 10px;
-    margin-left: auto;
-  }
-  .file-message:hover {
-      cursor: pointer;
-  }
-  .ai-file {
-    width: 130px;
-    display: flex;
-    align-items: center;
-    background-color: #f0f0f0;
-    border-radius: 10px;
-    padding: 10px;
-    margin-right: auto;
-  }
-
- .file-icon {
-    font-size: 24px;
-    margin-right: 10px;
-  }
-  
-  .file-info {
-    flex-grow: 1;
-  }
-  
-  .file-name {
-    font-weight: bold;
-    display: block;
-  }
-  
-  .file-size {
-    font-size: 12px;
-    color: #666;
-  }
-  
-  .view-file-btn {
-    background-color: #3498db;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    padding: 5px 10px;
-    cursor: pointer;
-    transition: background-color 0.3s;
-  }
-  
-  .view-file-btn:hover {
-    background-color: #2980b9;
-  }
-  
-  .input-area {
-    padding: 20px;
-    border-top: 1px solid #e0e0e0;
-  }
-  
-  .message-form {
-    display: flex;
-    margin-bottom: 10px;
-  }
-  
-  .input-field {
-    flex-grow: 1;
-    padding: 10px 15px;
-    border: 1px solid #bdc3c7;
-    border-radius: 20px;
-    resize: none;
-    font-size: 16px;
-    transition: border-color 0.3s;
-    min-height: 40px;
-    max-height: 120px;
-    overflow-y: auto;
-  }
-  
-  .input-field:focus {
-    outline: none;
-    border-color: #3498db;
-  }
-  
-  .send-button {
-    background-color: #3498db;
-    color: white;
-    border: none;
-    border-radius: 50%;
-    width: 40px;
-    height: 40px;
-    margin-left: 10px;
-    cursor: pointer;
-    transition: background-color 0.3s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .send-button:hover:not(:disabled) {
-    background-color: #2980b9;
-  }
-  
-  .send-button:disabled {
-    background-color: #bdc3c7;
-    cursor: not-allowed;
-  }
-  
-  .file-upload {
-    margin-top: 10px;
-  }
-  
-  .file-input {
-    display: none;
-  }
-  .file-icon svg {
-  width: 24px;
-  height: 24px;
-  color: rgb(53, 57, 171);
+    nextTick()
 }
-  
-  .upload-button {
-    padding: 8px 15px;
-    background-color: gray;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background-color 0.3s;
-    display: flex;
-    align-items: center;
+  // // console.log(graph_data)
+  // workflowStore.updateGraphData(graph_data.task['title'],graph_data.graph_data)
+  // workflowStore.updateWorkflowCard(graph_data.task['title'],graph_data.task)
+}catch (error) {
+  console.error('获取AI响应时出错:', error);
+  // 可以在这里添加错误处理逻辑，比如显示错误消息给用户
+
+}
+  // console.log(aiResponse)
+
+};
+// 格式化 node_description
+const formatNodeDescription = (nodeDescription) => {
+  if (typeof nodeDescription === 'string') {
+    // 如果是字符串，直接返回
+    return `工作流程节点描述：\n\n${nodeDescription}`;
+  } else if (typeof nodeDescription === 'object' && nodeDescription !== null) {
+    // 如果是对象，按之前的方式处理
+    let formattedText = '工作流程节点描述：\n\n';
+    for (const [nodeKey, nodeValue] of Object.entries(nodeDescription)) {
+      formattedText += `• **${nodeKey}**: ${nodeValue}\n\n`;
+    }
+    return formattedText;
+  } else {
+    // 如果既不是字符串也不是对象，返回错误信息
+    console.warn('无效的 node_description 格式:', nodeDescription);
+    return '无法显示工作流程节点描述。';
   }
-  
-  .upload-button:hover {
-    background-color: #27ae60;
+};
+const stopAIResponse = () => {
+stopTyping.value = true;
+isTyping.value = false;
+};
+// 监听当前对话索引的变化
+watch(() => conversationStore.currentConversationIndex, () => {
+scrollToBottom()
+})
+// 滚动到底部
+const scrollToBottom = () => {
+if (chatMessages.value) {
+  chatMessages.value.scrollTop = chatMessages.value.scrollHeight;
+}
+};
+
+const onFileSelected = (event) => {
+  selectedFile.value = event.target.files[0]
+}
+// 调整输入框高度
+const adjustTextareaHeight = () => {
+  const textarea = inputField.value
+  textarea.style.height = 'auto'
+  textarea.style.height = textarea.scrollHeight + 'px'
+}
+
+
+// 格式化文件大小
+const formatFileSize = (bytes) => {
+  if (bytes < 1024) return bytes + ' B'
+  else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'
+  else if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB'
+  else return (bytes / 1073741824).toFixed(1) + ' GB'
+}
+// 文件上传
+const fileUpload = () => {
+  if (fileInput.value)
+  fileInput.value.click()
+}
+//删除文件
+const removeFile = () => {
+  clearSelectedFile()
+};
+//   const viewFile = (file) => {
+//   //   if (file.path==='http://0.0.0.0:8020/html_file') {
+//   //   // const url=file.path
+//   //   // window.open(url, '_blank')
+//   //   resultUrl.value = file.path
+//   //   resultWindowVisible.value = true
+//   // }
+//   // else{
+//   //   downloadFile(file.path)
+//   //   resultUrl.value = file.path
+//   //   resultWindowVisible.value = true
+//   // }
+// 查看文件
+const viewFile = (file) => {
+
+resultUrl.value = file.path
+resultWindowVisible.value = true
+chatWidth.value = 1000
+resultWidth.value =500
+}
+// 清除文件的处理函数
+const clearSelectedFile = () => {
+selectedFile.value = null;
+if (fileInput.value) {
+  fileInput.value.value = '';
+}
+};
+// 下载文件的处理函数
+const downloadFile = (path) => {
+  const url = `http://0.0.0.0:8020${path}`; // 设置下载文件的后端URL
+  // 发送GET请求获取文件
+  axios({
+    url: url,
+    method: 'GET',
+    responseType: 'blob', // 设置响应类型为blob，用于下载文件
+  }).then(response => {
+    // 创建一个链接元素用于下载
+    const link = document.createElement('a');
+    // 创建一个blob对象，并设置文件的mime类型
+    const blob = new Blob([response.data], { type: 'application/octet-stream' });
+    // 创建一个指向blob的URL
+    const href = window.URL.createObjectURL(blob);
+    link.href = href;
+    link.download = 'processed_file.txt'; // 设置下载文件名
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    // 释放blob URL
+    window.URL.revokeObjectURL(href);
+  }).catch(error => {
+    console.error('下载失败:', error);
+  });
+}
+// 解析ai回复消息的样式标签
+const parseStyleTags = (text) => {
+  if (typeof text !== 'string') {
+    console.warn('parseStyleTags 收到了非字符串类型的输入:', text);
+    return String(text); // 尝试将输入转换为字符串
   }
+return text
+  .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+  .replace(/\*(.*?)\*/g, '<em>$1</em>')
+  .replace(/__(.*?)__/g, '<u>$1</u>')
+  .replace(/~~(.*?)~~/, '<del>$1</del>')
+  .replace(/\n/g, '<br>')// 添加这一行来处理换行
+  .replace(/```(.*?)```/g, '<pre>$1</pre>')
+  .replace(/\[workflow url="(.*?)"](.*?)\[\/workflow]/g, (match, url, content) => 
+    `<a href="#" class="workflow-link" data-url="${url}">${content}</a>`
+  );
+};
+onMounted(() => {
+  adjustTextareaHeight()
+})
+// 卸载事件
+onUnmounted(() => {
+window.removeEventListener('mousemove', resize)
+window.removeEventListener('mouseup', stopResize)
+})
+</script>
+
+<style scoped>
+/* 整体布局 */
+.app-container {
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+  height: 100vh;
   
-  .selected-file {
-    margin-top: 10px;
-    font-size: 14px;
-    color: #7f8c8d;
-  }
-  
-  .icon {
-    margin-right: 5px;
-  }
-  
-  @media (max-width: 768px) {
-    .app-container {
-      flex-direction: column;
-    }
-  
-    .sidebar {
-      width: 100%;
-      max-height: 50vh;
-    }
-  
-    .sidebar-collapsed .sidebar {
-      width: 100%;
-      max-height: 60px;
-    }
-  
-    .sidebar-collapsed .chat-container {
-      margin-left: 0;
-    }
-  
-    .chat-box {
-      margin: 10px;
-    }
-  
-    .message {
-      max-width: 85%;
-    }
-  }
-  </style>
+
+}
+.workflow-link {
+  color: #007bff;
+  text-decoration: underline;
+  cursor: pointer;
+}
+/* 整体布局 */
+.chat-container {
+display: flex;
+flex-direction: column;
+overflow-y: auto;
+height: 100vh;
+background-color: #f3f4f6;
+  /* 添加内边距 */
+}
+.resizer {
+width: 8px;
+background-color: #e0e0e0;
+cursor: col-resize;
+transition: background-color 0.3s;
+z-index: 1000;
+}
+
+.resizer:hover {
+background-color: #007AFF;
+}
+.chat-box {
+flex-grow: 1;
+display: flex;
+flex-direction: column;
+/* background-color: #ffffff; */
+border-radius: 8px;
+box-shadow: 0 0 1px rgba(0, 0, 0, 0.3); /* 四边都有阴影效果 */
+margin: 20px;
+overflow: hidden;
+}
+
+/* 聊天消息区域 */
+.chat-messages {
+flex-grow: 1;
+overflow-y: auto;
+padding: 20px;
+display: flex;
+flex-direction: column;
+background-color: #f5f5f5;
+}
+
+.message-wrapper {
+display: flex;
+flex-direction: column;
+margin-bottom: 20px;
+}
+
+.message {
+max-width: 80%;
+padding: 12px 16px;
+border-radius: 12px;
+line-height: 1.5;
+box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.user-message {
+background-color: #007AFF;
+color: white;
+margin-left: auto;
+border-bottom-right-radius: 4px;
+margin-bottom: 6px;
+}
+
+.ai-message {
+background-color: white;
+color: #333;
+margin-right: auto;
+border-bottom-left-radius: 4px;
+margin-bottom: 6px;
+}
+
+/* AI 消息内容样式 */
+.ai-message .message-content {
+font-size: 15px;
+}
+
+.ai-message .message-content strong {
+line-height: 1.2;
+font-weight: 600;
+color: #333;
+}
+
+.ai-message .message-content em {
+font-style: italic;
+color: #555;
+}
+
+.ai-message .message-content u {
+text-decoration: underline;
+color: #333;
+}
+
+.ai-message .message-content del {
+text-decoration: line-through;
+color: #777;
+}
+
+.ai-message .message-content pre {
+background-color: #f0f0f0;
+border-radius: 6px;
+padding: 12px;
+overflow-x: auto;
+font-family: 'Courier New', Courier, monospace;
+font-size: 14px;
+margin: 10px 0;
+}
+
+.ai-message .message-content code {
+background-color: #f0f0f0;
+padding: 2px 4px;
+border-radius: 4px;
+font-family: 'Courier New', Courier, monospace;
+font-size: 14px;
+}
+
+.message-content {
+word-wrap: break-word;
+white-space: pre-wrap;
+}
+
+.typing-indicator {
+padding: 10px;
+font-style: italic;
+color: #666;
+}
+
+/* 文件消息样式 */
+.user-file, .ai-file {
+width: 180px;
+display: flex;
+align-items: center;
+background-color: #f0f0f0;
+border-radius: 10px;
+padding: 10px;
+}
+
+.user-file {
+margin-left: auto;
+}
+
+.ai-file {
+margin-right: auto;
+}
+
+.file-message:hover {
+cursor: pointer;
+}
+
+/* 图标样式 */
+.iconfont {
+font-size: 24px;
+}
+
+/* 文件预览样式 */
+.file-preview {
+display: flex;
+align-items: center;
+background-color: #f0f0f0;
+border-radius: 8px;
+padding: 8px 12px;
+margin-top: 10px;
+max-width: 210px;
+}
+
+.file-icon {
+width: 40px;
+height: 40px;
+border-radius: 8px;
+display: flex;
+align-items: center;
+justify-content: center;
+}
+
+.file-icon .iconfont {
+color: black;
+}
+
+.file-upload .iconfont {
+cursor: pointer;
+color: #666;
+}
+
+.send-button .iconfont {
+color: white;
+}
+
+.file-info {
+display: flex;
+flex-direction: column;
+flex-grow: 1;
+overflow: hidden;
+}
+
+.file-name {
+font-size: x-small;
+font-weight: bold;
+white-space: nowrap;
+overflow: hidden;
+text-overflow: ellipsis;
+margin-bottom: 2px;
+}
+
+.file-size {
+font-size: 12px;
+color: #666;
+}
+
+.remove-file-btn {
+background: none;
+border: none;
+cursor: pointer;
+font-size: 18px;
+color: #666;
+padding: 0;
+margin-left: 8px;
+}
+
+.remove-file-btn:hover {
+color: #ff0000;
+}
+/* 新建对话按钮 */
+.new-chat-button button{
+display: inline-flex;
+          align-items: center;
+          padding: 8px 16px;
+          background-color: #f0f0f0;
+          border: none;
+          border-radius: 20px;
+          font-family: Arial, sans-serif;
+          font-size: 14px;
+          cursor: pointer;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+          transition: background-color 0.3s ease;
+          margin-bottom: 5px;
+          margin-left: 10px;
+}
+.button:hover {
+          background-color: #e0e0e0;
+      }
+
+.button-icon {
+margin-right: 8px;
+font-size: 18px;
+      }
+/* 输入区域样式 */
+.input-area {
+padding: 10px;
+border-top: 1px solid #e0e0e0;
+background-color: #ffffff;
+}
+
+.message-form {
+display: flex;
+margin-bottom: -13px;
+padding: 5px 10px;
+}
+
+.input-field {
+flex-grow: 1;
+border: none;
+background-color: transparent;
+resize: none;
+font-size: 16px;
+padding: 10px;
+max-height: 100px;
+overflow-y: auto;
+}
+
+.input-field:focus {
+outline: none;
+}
+
+.send-button {
+background-color: #3498db;
+color: white;
+border: none;
+border-radius: 50%;
+width: 36px;
+height: 36px;
+cursor: pointer;
+display: flex;
+align-items: center;
+justify-content: center;
+transition: background-color 0.3s;
+}
+
+.send-button:hover:not(:disabled) {
+background-color: #2980b9;
+}
+
+.send-button:disabled {
+background-color: #bdc3c7;
+cursor: not-allowed;
+}
+
+.file-upload {
+position: relative;
+margin-right: 10px;
+}
+
+.file-input {
+display: none;
+}
+
+
+</style>

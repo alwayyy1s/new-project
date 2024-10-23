@@ -1,15 +1,23 @@
 <template>
   <div class="node-menu" :style="menuStyle">
     <div class="menu-content">
-      <button v-for="(item, index) in menuItems" :key="index" @click="$emit('add-child', item.action)">
-        <span class="icon" :class="item.iconClass"></span>
-        {{ item.label }}
-      </button>
+      <div v-for="(group, groupIndex) in menuItems" :key="groupIndex" class="menu-group">
+        <div class="group-title">{{ group.group }}</div>
+        <button 
+          v-for="(item, index) in group.items" 
+          :key="index" 
+          @click="$emit('add-child', item.action)"
+        >
+          <span class="icon" :class="item.iconClass"></span>
+          {{ item.label }}
+        </button>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
+import LLM from '@/views/LLM.vue';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -25,16 +33,35 @@ const menuStyle = computed(() => ({
 }));
 
 const menuItems = [
-  { label: '请求数据', action: 'node1', iconClass: 'i-data' },
-  { label: '页面跳转', action: 'node2', iconClass: 'i-navigate' },
-  { label: '数据转换', action: 'transform', iconClass: 'i-transform' },
-  { label: '条件判断', action: 'condition', iconClass: 'i-condition' },
-  { label: '循环操作', action: 'loop', iconClass: 'i-loop' },
-  { label: '异常处理', action: 'error', iconClass: 'i-error' },
-  { label: '数据存储', action: 'store', iconClass: 'i-store' },
-  { label: '消息推送', action: 'notify', iconClass: 'i-notify' },
-  { label: '定时任务', action: 'schedule', iconClass: 'i-schedule' },
-  { label: 'API调用', action: 'api', iconClass: 'i-api' },
+  {
+    group: '基础节点',
+    items: [
+      { label: '开始', action: 'startNode', iconClass: 'i-data' },
+      { label: '结果输出', action: 'endNode', iconClass: 'i-loop' },
+    ]
+  },
+  {
+    group: '输入',
+    items: [
+      { label: '文件上传', action: 'node1', iconClass: 'i-navigate' },
+      { label: '用户输入', action: 'node1', iconClass: 'i-error' },
+      
+    ]
+  },
+  {
+    group: '处理节点',
+    items: [
+      { label: '模型调用', action: 'node2', iconClass: 'i-transform' },
+      { label: '工具调用', action: 'node3', iconClass: 'i-condition' },
+      { label: '文件处理', action: 'store', iconClass: 'i-store' },
+    ]
+  },
+  {
+    group: '其他',
+    items: [
+      { label: '提示词', action: 'notify', iconClass: 'i-notify' },
+    ]
+  }
 ];
 
 defineEmits(['add-child']);
@@ -76,7 +103,16 @@ defineEmits(['add-child']);
 .menu-content::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
 }
+.menu-group {
+  margin-bottom: 8px;
+}
 
+.group-title {
+  font-size: 12px;
+  color: #888;
+  padding: 4px 10px;
+  font-weight: bold;
+}
 button {
   display: flex;
   align-items: center;

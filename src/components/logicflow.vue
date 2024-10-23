@@ -1,6 +1,6 @@
 <script setup>
-import { onMounted, ref} from 'vue'
-import {useRouter} from 'vue-router'
+import { onMounted, ref,watch} from 'vue'
+import {useRouter,useRoute} from 'vue-router'
 import LogicFlow from "@logicflow/core";
 import { DndPanel, SelectionSelect,Group ,Menu,Control} from "@logicflow/extension";
 import "@logicflow/core/lib/style/index.css";
@@ -13,16 +13,18 @@ import node1 from './Nodes/node1/node1.js'
 import node2 from './Nodes/node2/node2.js'
 import Start from './Porperty/Start.vue'
 import End from './Porperty/end.vue'
-import SmoothPolylineEdge  from './Edges/test.js'
+import smoothPolyline  from './Edges/test.js'
 import PropertyDialog from './Porperty/PropertyDialog.vue'
 import PropertyDialogA from './Porperty/PropertyDialogA.vue'
 import PropertyDialogB from './Porperty/PropertyDialogB.vue'
-import {useFormStore} from '@/stores/counter'
-// import sendPrompt from '@/components/llm';
-
 import NodeMenu from './Porperty/NodeMenu.vue';
+import {useFormStore} from '@/stores/counter'
+import { postGraphData,getGraphData } from '@/utils/Graph.js';
+
 const router = useRouter()
+const route=useRoute()
 const formStore = useFormStore();
+
 const fromData =formStore.fromData
 const showMenu = ref(false);
 const menuPosition = ref({ x: 0, y: 0 });
@@ -31,17 +33,37 @@ const showEnd =ref(false);
 const selectedNode = ref({});
 const container = ref(null); 
 const lf= ref(null)
-const graphData={
-  nodes:[
-    {
-      id:'1',
-      type:'startNode',
-      x:200,
-      y:300,
-    }
-  ]
-}
-
+// const graphData={
+//   nodes: [
+//     // 节点数据属性：节点1
+//     {
+//       id: 'node_id_1',
+//       type: 'startNode',
+//       x: 200,
+//       y: 300,
+      
+//     },
+//   //   // 节点2
+//   //   {
+//   //     id: 'node_id_2',
+//   //     type: 'node2',
+//   //     x: 200,
+//   //     y: 300,
+      
+//   //   },
+//   ],
+//   // edges: [
+//   //   // 边数据属性
+//   //   {
+//   //     id: 'edge_id',
+//   //     type: 'smoothPolyline',
+//   //     sourceNodeId: 'node_id_1',
+//   //     targetNodeId: 'node_id_2',
+      
+//   //   },
+//   // ],
+// }
+const graphData=ref(null)
 const patternItems = [
     {
       type: 'startNode',
@@ -82,7 +104,24 @@ const patternItems = [
 
 
   }]
+// 更新图数据
+const updateGraphData =async () => {
+const title = route.params.title;
+const response=await getGraphData(title);
+graphData.value=response;
+};
+// 监听路由参数的变化
+watch(() => route.params.title, () => {
+  updateGraphData();
+  
+});
 
+// 监听 graphData 的变化，并在变化时重新渲染
+watch(graphData, (newData) => {
+  if (lf.value && newData) {
+    lf.value.render(newData);
+  }
+}, { deep: true }); 
 
 
 
@@ -100,23 +139,27 @@ onMounted(()=>{
         stopZoomGraph: true,
     })
     lf.value.extension.dndPanel.setPatternItems(patternItems)
+    lf.value.register(smoothPolyline)
     lf.value.register(startNode)
     lf.value.register(endNode)
     lf.value.register(node1)
     lf.value.register(node2)
-    lf.value.register(SmoothPolylineEdge)
+    // 渲染图数据
     lf.value.render(graphData)
-
+    updateGraphData()
+    // 点击空白处关闭节点菜单
     lf.value.on('blank:click', closeMenu);
+    // 点击自定义节点事件
     lf.value.on('custom-node-event:click',({ data}) => {
     showNodeMenu(data);
   })
+    // 双击节点事件
     lf.value.on('node:dbclick', ({ data }) => {
       console.log(data)
     selectedNode.value = data;
     showDialog.value = true;
   });
-
+  // 连接失败事件
     lf.value.on('connection:not-allowed',({msg})=>{
       if(msg){
         console.log(msg)
@@ -131,7 +174,7 @@ onMounted(()=>{
     })
 });
 
-
+// 显示节点菜单
 const showNodeMenu = (nodeData) => {
   selectedNode.value = nodeData;
   // 调整菜单位置，考虑节点的尺寸
@@ -141,10 +184,11 @@ const showNodeMenu = (nodeData) => {
   };
   showMenu.value = true;
 };
+// 关闭节点菜单
 const closeMenu = () => {
   showMenu.value = false;
 };
-
+// 添加子节点 
 const addChildNode = (type) => {
   const parentNode = selectedNode.value;
   const childNode = {
@@ -163,7 +207,7 @@ const addChildNode = (type) => {
   });
   closeMenu();
 };
-
+// 运行
 const run = () => {
   // 在这里添加您的运行逻辑
   showEnd.value=true;
@@ -177,17 +221,60 @@ const run = () => {
 }
   console.log('运行按钮被点击');
 };
+// 返回
 const goback=()=>{
   router.back()
 }
-const save=()=>{
-  console.log(lf.value.getGraphData())
+// 简化边数据
+const simplifyEdgeData = (edge) => {
+  return {
+    id: edge.id,
+    type: edge.type,
+    sourceNodeId: edge.sourceNodeId,
+    targetNodeId: edge.targetNodeId,
+    properties: edge.properties
+  };
+  };
+// 保存
+const save = async () => {
+  try {
+    const fullGraphData = lf.value.getGraphData();
+    const simplifiedEdges = fullGraphData.edges.map(simplifyEdgeData);
+    
+    const simplifiedGraphData = {
+      ...fullGraphData,
+      edges: simplifiedEdges
+    };
+    const title = route.params.title
+    const task_data={title:title,showOption:false}
+    
+  
+    // 更新后端数据库
+    const response = await postGraphData (task_data,simplifiedGraphData)
+    
+
+    if (response.message) {
+      ElMessage({
+        message: '保存成功',
+        type: 'success',
+      })
+    } else {
+      throw new Error('保存失败')
+    }
+   } catch (error) {
+    console.error('保存出错:', error)
+    ElMessage({
+      message: '保存失败，请重试',
+      type: 'error',
+    })
+  }
 }
 </script>
 
 <template>
     
-    <div ref="container" id="container" ></div>
+    <div class="logicflow-container">
+    <div ref="container" id="container"></div>
     <node-menu
       v-if="showMenu"
       :position="menuPosition"
@@ -195,66 +282,83 @@ const save=()=>{
       @add-child="addChildNode"
       @close="closeMenu"
     />
-    <el-button class="btn-save" type="success" round @click="save" size="large" :icon="Check">保存</el-button>
-    <el-button class="btn-back" type="round" round @click="goback" size="large" :icon="Back">返回</el-button>
-    <el-button class="btn-run" type="primary" round @click="run" size="large" :icon="CaretRight">运行</el-button>
-     <End v-if="showEnd" @close="showEnd = false" @update="UpdateEnd"   ></End>
+    <div class="button-container">
+      <el-button class="btn-run" type="primary" round @click="run" size="large" :icon="CaretRight">运行</el-button>
+      <el-button class="btn-save" type="success" round @click="save" size="large" :icon="Check">保存</el-button>
+      <el-button class="btn-back" type="round" round @click="goback" size="large" :icon="Back">返回</el-button>
+    </div>
+    <!-- 其他组件保持不变 -->
+    <End v-if="showEnd" @close="showEnd = false" @update="UpdateEnd"   ></End>
     <div v-if="showDialog">
     <Start v-if="selectedNode.type==='startNode'"  @close="showDialog = false" @update="UpdateStart "></Start>
     <PropertyDialog v-if="selectedNode.type==='node1'"  @close="showDialog = false" @update="UpdateLLM " />
     <PropertyDialogA v-if="selectedNode.type==='node2'" :node="selectedNode" @close="showDialog = false" @update="handleUpdateName " />
     <PropertyDialogB v-if="selectedNode.type==='vuehtml3'" :node="selectedNode" @close="showDialog = false" @update="handleUpdateName " />
     </div>
+  </div>
+   
 
 
 </template>
 
 <style >
 #container {
-    width: 100%;
-    height: 630px;
-    border: 1px solid #9a9dc4d8;
-    position: relative; 
+  width: 100%;
+  height: 100vh; 
+  border: none; /* 移除边框 */
+  position: relative;
 }
-.btn-run{
+.button-container {
   position: absolute;
-    right: 500px;
-    top: 98px;
+  top: 8px;
+  right: 300px;
+  display: flex;
+  flex-direction: column;
+  
 }
-.btn-save{
+
+.btn-run, .btn-save, .btn-back {
   position: absolute;
-    right: 400px;
-    top: 98px;
+  top: 20px;
 }
-.btn-back{
-  position: absolute;
-    right: 300px;
-    top: 98px;
+
+.btn-run {
+  right: 220px;
+}
+
+.btn-save {
+  right: 120px;
+}
+
+.btn-back {
+  right: 20px;
 }
 
 .lf-dndpanel {
-    display: flex; /* 使用 flex 布局 */
-    flex-direction: row; /* 水平排列 */
-    align-items: center; /* 垂直居中对齐 */
-    justify-content: flex-start; /* 从左向右排列 */
-    position: absolute;
-    height: 70px;
-    left: 5% ;
-    margin: 5px;
-    padding: 18px 5px;
-    background: rgba(255, 255, 255, 0.8);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
-    border-radius: 5px;
+  display: flex;
+  flex-direction: row;
+  
+  
+  height: 60px;
+  left: 20px;
+  
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
 }
 
-/* 自定义拖拽项的样式，确保它们在水平面板中正确显示 */
 .lf-dndpanel .lf-dnd-item {
-    margin-right: 10px; /* 在拖拽项之间添加间隔 */
+  margin-right: 15px;
+  transition: transform 0.2s;
 }
 
-/* 最后一个拖拽项可能不需要右边距 */
+.lf-dndpanel .lf-dnd-item:hover {
+  transform: scale(1.1);
+}
+
 .lf-dndpanel .lf-dnd-item:last-child {
-    margin-right: 0;
+  margin-right: 0;
 }
 
 </style>

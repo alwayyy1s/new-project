@@ -4,113 +4,131 @@
       v-for="workflow in workflows" 
       :key="workflow.id" 
       class="workflow-card"
-      @click="navigateToWorkflow(workflow.id)"
+      @click="navigateToWorkflow(workflow.title)"
     >
-    
       <div class="workflow-card-content">
-        <div class="workflow-icon" :style="{ backgroundColor: workflow.iconBg }">
-          <img :src="workflow.icon" :alt="workflow.title" class="icon" />
+        <div class="workflow-icon" >
+          <i class="iconfont icon-user_pin"></i>
         </div>
         <div class="workflow-info">
           <h3 class="workflow-title">{{ workflow.title }}</h3>
-          <p class="workflow-category">{{ workflow.category }}</p>
         </div>
+       
         <div class="workflow-options">
           <button @click.stop="toggleOptions(workflow.id)" class="options-button">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="options-icon">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-            </svg>
+            <i class="iconfont icon-gengduo"></i>
           </button>
-          <div v-if="workflow.showOptions" class="options-menu" >
-            <div class="option" @click.stop="editWorkflow(workflow.id)">编辑</div>
+          <div v-if="workflow.showOption" class="options-menu" >
+            <!-- <div class="option" @click.stop="editWorkflow(workflow.id)">编辑</div> -->
             <div class="option" @click.stop="deleteWorkflow(workflow.id)">删除</div>
           </div>
         </div>
+        
       </div>
-      <!-- <div class="workflow-tags">
-        <button class="add-tag-button" @click.stop="addTag(workflow.id)">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="add-icon">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-          </svg>
-          添加标签
-        </button>
-      </div> -->
+
+      
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref ,onMounted} from 'vue';
 import { useRouter } from 'vue-router';
+import { ElMessageBox, ElMessage } from 'element-plus';
+import {getWorkCardData,deleteGraphData} from '@/utils/Graph.js'
 const router = useRouter();
-const workflows = ref([
-  {
-    id: 1,
-    title: '全书翻译',
-    category: '工作流',
-    icon: '/placeholder.svg?height=40&width=40',
-    iconBg: '#FFF0E6',
-    showOptions: false
-  },
-  {
-    id: 2,
-    title: '文本总结工作流',
-    category: '工作流',
-    icon: '/placeholder.svg?height=40&width=40',
-    iconBg: '#E6F7FF',
-    showOptions: false
-  },
-  {
-    id: 3,
-    title: '文本情感分析工作流',
-    category: '工作流',
-    icon: '/placeholder.svg?height=40&width=40',
-    iconBg: '#F6FFED',
-    showOptions: false
-  },
-  {
-    id: 4,
-    title: '文本总结工作流',
-    category: '工作流',
-    icon: '/placeholder.svg?height=40&width=40',
-    iconBg: '#FFF0F6',
-    showOptions: false
-  }
-]);
+// const workflows = ref([
+//   {
+//     id: 1,
+//     title: '全书翻译',
+//     showOptions: false
+    
+//     // showOptions: false
+//   },
+//   {
+//     id: 2,
+//     title: '文本总结工作流',
+//     showOptions: false
+//   },
+//   {
+//     id: 3,
+//     title: '文本情感分析工作流',
+//     showOptions: false
+//   },
+//   {
+//     id: 4,
+//     title: '文本总结工作流',
+//     showOptions: false
+//   }
+// ]);
 
+const workflows=ref([])
 
-const navigateToWorkflow = (id) => {
-  router.push(`/workspace/workflow/${id}`);
+const updateWorkflows = async () => {
+  // 发送获取工作流请求
+  const response=await getWorkCardData()
+  console.log(response)
+  workflows.value=response
+  console.log(workflows.value)
+}
+
+// 初始调用一次
+updateWorkflows();
+
+// 使用 onMounted 钩子函数来初始化数据
+onMounted(() => {
+  updateWorkflows();
+});
+// 导航到工作流
+const navigateToWorkflow = (title) => {
+  router.push(`/workspace/workflow/${title}`);
 };
-
+// 切换工作流选项
 const toggleOptions = (id) => {
   const workflow = workflows.value.find(w => w.id === id);
   if (workflow) {
-    workflow.showOptions = !workflow.showOptions;
+   workflow.showOption = !workflow.showOption
   }
 };
 
-const editWorkflow = (id) => {
-  console.log(`Editing workflow ${id}`);
-  const workflow = workflows.value.find(w => w.id === id);
-  workflow.showOptions=false
-  // Implement edit logic here
-};
 
-const deleteWorkflow = (id) => {
-  console.log(`Deleting workflow ${id}`);
+// 删除工作流
+const deleteWorkflow = async (id) => {
   const workflow = workflows.value.find(w => w.id === id);
-  workflow.showOptions=false
-  // Implement delete logic here
-};
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除标题为 "${workflow.title}" 的工作流吗？`,
+      '警告',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    );
+    // 发送删除图数据请求
+    await deleteGraphData(workflow.title)
+    // 更新工作流数据
+    updateWorkflows()
 
-// const addTag = (id) => {
-//   console.log(`Adding tag to workflow ${id}`);
-//   // Implement add tag logic here
-// };
+    // 显示成功消息
+    ElMessage({
+      type: 'success',
+      message: '工作流删除成功',
+    });
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('删除工作流时出错:', error);
+      ElMessage({
+        type: 'error',
+        message: '删除工作流失败',
+      });
+    }
+  }
+};
 </script>
 
 <style scoped>
+
 .workflow-grid {
   display: grid;
   grid-template-columns: auto auto auto auto;
@@ -126,6 +144,10 @@ const deleteWorkflow = (id) => {
   overflow: hidden;
   transition: all 0.3s ease;
   cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 160px; /* 设置最小高度 */
 }
 
 .workflow-card:hover {
@@ -142,6 +164,7 @@ const deleteWorkflow = (id) => {
 .workflow-icon {
   width: 3rem;
   height: 3rem;
+  background-color: #FFF0E6;
   border-radius: 0.5rem;
   display: flex;
   align-items: center;
@@ -154,9 +177,9 @@ const deleteWorkflow = (id) => {
   transform: scale(1.1);
 }
 
-.icon {
-  width: 1.5rem;
-  height: 1.5rem;
+.iconfont {
+  font-size: 1.5rem;
+  color: #333;
 }
 
 .workflow-info {
@@ -183,6 +206,7 @@ const deleteWorkflow = (id) => {
 
 .workflow-options {
   position: relative;
+  align-self: flex-end;
 }
 
 .options-button {
@@ -224,31 +248,5 @@ const deleteWorkflow = (id) => {
 
 .option:hover {
   background-color: #f0f0f0;
-}
-
-.workflow-tags {
-  padding: 0.5rem 1rem;
-  border-top: 1px solid #e0e0e0;
-}
-
-.add-tag-button {
-  display: flex;
-  align-items: center;
-  background: none;
-  border: none;
-  color: #666;
-  cursor: pointer;
-  font-size: 0.875rem;
-  transition: all 0.3s ease;
-}
-
-.add-tag-button:hover {
-  color: #1890ff;
-}
-
-.add-icon {
-  width: 1rem;
-  height: 1rem;
-  margin-right: 0.25rem;
 }
 </style>

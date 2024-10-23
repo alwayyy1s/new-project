@@ -81,7 +81,10 @@ class SmoothPolylineEdgeModel extends PolylineEdgeModel {
     style.hover && (style.hover.stroke = 'red');
     return style;
   }
+
+
 }
+  
 
 class SmoothPolylineEdgeView extends PolylineEdge {
   getEdge() {

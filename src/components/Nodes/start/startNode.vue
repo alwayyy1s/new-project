@@ -6,9 +6,9 @@
     </div>
   
 
-  <div v-if="isShow" class="add" @click="handleClick">
-    <svg t="1724750019594"  class="icon add-icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1054" width="200" height="200"><path d="M873.753974 149.961384A511.715358 511.715358 0 1 0 149.676742 874.038616 511.715358 511.715358 0 0 0 873.753974 149.961384zM831.537457 828.623878a447.750939 447.750939 0 1 1-633.247756-633.247756 447.750939 447.750939 0 0 1 633.247756 633.247756z" fill="#2c2c2c" p-id="1055"></path><path d="M767.573037 480.01779H543.697568V256.142321a31.98221 31.98221 0 0 0-63.96442 0v223.875469H255.857679a31.98221 31.98221 0 0 0 0 63.96442h223.875469V767.857679a31.98221 31.98221 0 0 0 63.96442 0V543.98221H767.573037a31.98221 31.98221 0 0 0 0-63.96442z" fill="#2c2c2c" p-id="1056"></path></svg>    </div>
-
+    <div class="add" @click="handleClick" >
+      <svg v-if="props.showCross" t="1724750019594" class="icon add-icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1054" width="200" height="200"><path d="M873.753974 149.961384A511.715358 511.715358 0 1 0 149.676742 874.038616 511.715358 511.715358 0 0 0 873.753974 149.961384zM831.537457 828.623878a447.750939 447.750939 0 1 1-633.247756-633.247756 447.750939 447.750939 0 0 1 633.247756 633.247756z" fill="#2c2c2c" p-id="1055"></path><path d="M767.573037 480.01779H543.697568V256.142321a31.98221 31.98221 0 0 0-63.96442 0v223.875469H255.857679a31.98221 31.98221 0 0 0 0 63.96442h223.875469V767.857679a31.98221 31.98221 0 0 0 63.96442 0V543.98221H767.573037a31.98221 31.98221 0 0 0 0-63.96442z" fill="#2c2c2c" p-id="1056"></path></svg>
+    </div>
 
 </div>
 
@@ -17,11 +17,12 @@
 
 <script setup>
 import { ref,defineEmits} from 'vue';
-const isShow=ref(true)
+
+const props=defineProps(['showCross'])
 const emit=defineEmits(['customEvent'])
 const handleClick=()=>{
   emit('customEvent')
-  isShow.value=false
+
 }
 
 </script>
@@ -40,7 +41,7 @@ const handleClick=()=>{
 .header {
   display: flex;
   align-items: center;
-  flex-shrink: 0;               /* 防止盒子缩小 */
+  flex-shrink: 0;
   flex-grow: 0;   
   border-radius: 15px;
   box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
@@ -49,6 +50,7 @@ const handleClick=()=>{
   width: 135px;
   height: 70px;
 }
+
 .header:hover {
   transform: scale(0.98);
   box-shadow: 0 4px 12px rgba(246, 240, 240, 0.15);
@@ -56,26 +58,29 @@ const handleClick=()=>{
 .icon {
   width: 20px;
   height: 20px;
-  padding-left:20px ;
+  padding-left: 20px;
 }
-.add{
+
+.add {
   display: flex;
   align-items: center;
-  flex-shrink: 0;               /* 防止盒子缩小 */
+  flex-shrink: 0;
   flex-grow: 0;   
   margin-left: -15px;
-  background:transparent;
+  background: transparent;
   z-index: 1000; 
+  cursor: pointer;
 }
-.add-icon:hover{
-  background-color: transparent; /* 鼠标悬停时的背景颜色 */
-  cursor: pointer; /* 鼠标悬停时显示为小手形状 */
+
+.add-icon {
+  width: 24px;
+  height: 24px;
 }
+
 h3 {
   font-size: 20px;
   font-weight: 500;
   color: #333;
-
 }
 
 

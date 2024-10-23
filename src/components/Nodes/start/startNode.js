@@ -1,14 +1,17 @@
 import { HtmlNode, HtmlNodeModel } from '@logicflow/core';
 import { createApp, h } from 'vue';
 import startNode from './startNode.vue';
+import { reactive } from 'vue';
 
 class VueHtmlNode extends HtmlNode {
   constructor(props) {
     super(props);
     this.isMounted = false;
     this.nodeData = props.model.getProperties();
-    this.r = h(startNode,{
-      onCustomEvent: this.handleCustomEvent.bind(this)
+    this.state = reactive({ showCross: false });
+    this.r = h(startNode, {
+      onCustomEvent: this.handleCustomEvent.bind(this),
+      showCross: this.state.showCross,
     });
     this.app = createApp({
       render: () => this.r
@@ -22,8 +25,20 @@ class VueHtmlNode extends HtmlNode {
       const node = document.createElement('div');
       rootEl.appendChild(node);
       this.app.mount(node);
+      // 添加鼠标事件监听器
+      node.addEventListener('mouseenter', this.handleMouseEnter.bind(this));
+      node.addEventListener('mouseleave', this.handleMouseLeave.bind(this));
     }
     } 
+    handleMouseEnter() {
+      this.state.showCross = true;
+      this.update();
+    }
+  
+    handleMouseLeave() {
+      this.state.showCross = false;
+      this.update();
+    }
    // 自定义事件处理程序
   handleCustomEvent() {
     const nodeData= this.props.model
@@ -32,6 +47,10 @@ class VueHtmlNode extends HtmlNode {
     this.props.model.graphModel.eventCenter.emit('custom-node-event:click',{
     data:nodeData,
     });
+  }
+  update() {
+    this.r.component.props.showCross = this.state.showCross;
+    this.app._instance.update();
   }
   }
 

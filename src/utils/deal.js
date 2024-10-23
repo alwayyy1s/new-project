@@ -18,3 +18,4 @@ export default async function deal (file,user_prompt) {
 
     return response.data
 }
+
